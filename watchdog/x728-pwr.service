@@ -1,0 +1,25 @@
+[Unit]
+Description=X728 Power Management and Watchdog Service
+Documentation=https://wiki.geekworm.com/X728-script
+After=network-online.target
+Wants=network-online.target
+Before=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/x728/watchdog.py
+WorkingDirectory=/opt/x728
+User=root
+Group=root
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
