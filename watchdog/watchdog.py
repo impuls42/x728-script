@@ -56,6 +56,7 @@ class X728Service:
         
         # State variables
         self.ac_power_ok = True
+        self.ac_last_change = time.monotonic()
         self.battery_voltage = 0.0
         self.battery_capacity = 0.0
         self.warning_active = False
@@ -84,6 +85,10 @@ class X728Service:
         self.critical_level = self.config.getint('Battery', 'CRITICAL_LEVEL', fallback=10)
         self.beep_enabled = self.config.getboolean('Battery', 'BEEP_ENABLED', fallback=True)
         self.beep_interval = self.config.getint('Battery', 'BEEP_INTERVAL', fallback=30)
+        # Seconds AC must stay lost before a critical shutdown. The X728 AON
+        # jumper powers the Pi on only on an AC edge, so shutting down while
+        # AC is coming back leaves the Pi off until the next outage ends.
+        self.ac_settle = self.config.getint('Battery', 'AC_SETTLE', fallback=30)
         
         # Watchdog settings. Every webhook is optional: an empty or missing one
         # is skipped. Uptime Kuma's (AC_WEBHOOK, DEVICE_WEBHOOK) take
@@ -244,6 +249,7 @@ class X728Service:
         """Monitor battery levels and trigger warnings/shutdown."""
         self.log("Battery monitor thread started")
         last_beep_time = 0
+        holding = False
         
         while self.running:
             try:
@@ -252,7 +258,17 @@ class X728Service:
                 
                 # Check critical level
                 if self.battery_capacity < self.critical_level and not self.ac_power_ok:
-                    self.log(f"CRITICAL: Battery at {self.battery_capacity:.1f}% - initiating shutdown")
+                    # Hold while AC is flapping: it may be coming back
+                    lost_for = time.monotonic() - self.ac_last_change
+                    if lost_for < self.ac_settle:
+                        if not holding:
+                            self.log(f"CRITICAL: Battery at {self.battery_capacity:.1f}% - AC changed {lost_for:.0f}s ago, "
+                                     f"holding shutdown until AC stays lost for {self.ac_settle}s")
+                            holding = True
+                        time.sleep(1)
+                        continue
+                    holding = False
+                    self.log(f"CRITICAL: Battery at {self.battery_capacity:.1f}% - AC lost for {lost_for:.0f}s, initiating shutdown")
                     
                     # Send emergency device webhook notifications
                     voltage = f"{self.battery_voltage:.2f}V"
@@ -268,6 +284,9 @@ class X728Service:
                     time.sleep(0.2)
                     self.beep(0.1)
                     time.sleep(5)
+                    if self.ac_power_ok:
+                        self.log("AC Power RESTORED during shutdown countdown - shutdown aborted")
+                        continue
                     self.trigger_shutdown()
                     break
                 
@@ -285,6 +304,9 @@ class X728Service:
                         self.log(f"Battery: {self.battery_capacity:.1f}% ({self.battery_voltage:.2f}V)")
                 
                 else:
+                    if holding:
+                        self.log("AC Power back - critical shutdown cancelled")
+                        holding = False
                     if self.warning_active:
                         self.log("Battery level OK - stopping warnings")
                         self.warning_active = False
@@ -378,12 +400,14 @@ class X728Service:
                             if event.event_type == EdgeEvent.Type.RISING_EDGE:
                                 # Power lost (PLD goes high)
                                 self.ac_power_ok = False
+                                self.ac_last_change = time.monotonic()
                                 self.log("AC Power LOST - running on battery")
                                 self.beep(0.5)
                                 
                             elif event.event_type == EdgeEvent.Type.FALLING_EDGE:
                                 # Power restored (PLD goes low)
                                 self.ac_power_ok = True
+                                self.ac_last_change = time.monotonic()
                                 self.warning_active = False
                                 self.log("AC Power RESTORED")
                                 self.beep(0.1)

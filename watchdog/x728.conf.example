@@ -17,6 +17,10 @@ CRITICAL_LEVEL = 10
 BEEP_ENABLED = false
 # Warning beep interval in seconds
 BEEP_INTERVAL = 120
+# Seconds AC must stay lost before the critical shutdown starts. With the AON
+# jumper the board powers the Pi on only when AC comes back, so a shutdown that
+# lands while AC is returning leaves the Pi off until the next outage ends.
+AC_SETTLE = 30
 
 [Watchdog]
 # AC power status webhook - sends only status=up/down based on AC power
