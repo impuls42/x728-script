@@ -1,0 +1,45 @@
+[GPIO]
+# GPIO chip device (gpiochip0 for Pi 3/4, gpiochip4 for Pi 5)
+GPIOCHIP = gpiochip0
+
+# GPIO pin numbers (BCM numbering)
+PIN_PLD = 6
+PIN_SHUTDOWN = 5
+PIN_BOOT = 12
+PIN_BUZZER = 20
+PIN_BUTTON = 26
+
+[Battery]
+# Battery capacity thresholds (percentage)
+WARN_LEVEL = 20
+CRITICAL_LEVEL = 10
+
+BEEP_ENABLED = false
+# Warning beep interval in seconds
+BEEP_INTERVAL = 120
+# Seconds AC must stay lost before the critical shutdown starts. With the AON
+# jumper the board powers the Pi on only when AC comes back, so a shutdown that
+# lands while AC is returning leaves the Pi off until the next outage ends.
+AC_SETTLE = 30
+
+[Watchdog]
+# AC power status webhook - sends only status=up/down based on AC power
+AC_WEBHOOK =
+
+# Device health webhook - sends battery capacity (ping) and status before shutdown
+DEVICE_WEBHOOK =
+
+# Tianji push URLs. Same pushes as above,
+# with Tianji parameter names (status/msg/value).
+TIANJI_AC_WEBHOOK =
+TIANJI_DEVICE_WEBHOOK =
+
+# Reporting interval in seconds (applies to every webhook). Half the 60 s monitor
+# interval: Kuma marks a push monitor down 61 s after the last push, and a
+# sleep(60) plus the pushes themselves took ~61 s, so every other beat was late.
+INTERVAL = 30
+
+[I2C]
+# I2C bus and address for battery fuel gauge
+BUS = 1
+ADDR = 0x36
